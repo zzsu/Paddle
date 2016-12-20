@@ -225,6 +225,8 @@ void Argument::resizeAndCopyFrom(const Argument& src,
   }
   resizeAndCopy(udp, src.udp, useGpu, stream);
   resizeAndCopy(strs, src.strs, useGpu, stream);
+  frameWidth = src.frameWidth;
+  frameHeight = src.frameHeight;
 }
 
 int32_t Argument::resizeAndCopyFrom(const Argument& src,
@@ -243,6 +245,8 @@ int32_t Argument::resizeAndCopyFrom(const Argument& src,
                                     bool useGpu,
                                     hl_stream_t stream) {
   dataId = src.dataId;
+  frameWidth = src.frameWidth;
+  frameHeight = src.frameHeight;
 
   if (!src.sequenceStartPositions) {
     // non-sequence input, copy samples directly

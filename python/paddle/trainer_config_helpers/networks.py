@@ -337,6 +337,7 @@ def img_conv_group(input,
                    conv_padding=1,
                    conv_filter_size=3,
                    conv_act=None,
+                   conv_type=None,
                    conv_with_batchnorm=False,
                    conv_batchnorm_drop_rate=0,
                    pool_stride=1,
@@ -397,6 +398,7 @@ def img_conv_group(input,
             padding=conv_padding[i],
             filter_size=conv_filter_size[i],
             num_filters=conv_num_filter[i],
+            layer_type=conv_type,
             **extra_kwargs)
 
         # logger.debug("tmp.num_filters = %d" % tmp.num_filters)

@@ -180,7 +180,9 @@ private:
       gtStr.push_back(labels[i]);
     }
 
-    return stringAlignment(gtStr, recogStr);
+    std::vector<int> gtStrWithoutEOS = path2String(gtStr);
+    return stringAlignment(gtStrWithoutEOS, recogStr);
+    // return stringAlignment(gtStr, recogStr);
   }
 
 public:

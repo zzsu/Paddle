@@ -132,27 +132,27 @@ void ConvProjection::reshape(int batchSize) {
   isSelectAlgo_ = (batchSize == batchNum_);
   batchNum_ = batchSize;
 
-  if (!isSelectAlgo_) {
-    reshapeTensorDesc(batchSize);
-    hl_conv_workspace(inputDesc_,
-                      outputDesc_,
-                      filterDesc_,
-                      convDesc_,
-                      &fwdAlgo_,
-                      &fwdLimitBytes_,
-                      &bwdDataAlgo_,
-                      &bwdDataLimitBytes_,
-                      &bwdFilterAlgo_,
-                      &bwdFilterLimitBytes_);
+  // if (!isSelectAlgo_) {
+  reshapeTensorDesc(batchSize);
+  hl_conv_workspace(inputDesc_,
+                    outputDesc_,
+                    filterDesc_,
+                    convDesc_,
+                    &fwdAlgo_,
+                    &fwdLimitBytes_,
+                    &bwdDataAlgo_,
+                    &bwdDataLimitBytes_,
+                    &bwdFilterAlgo_,
+                    &bwdFilterLimitBytes_);
 
-    size_t maxWorkSpace = 0;
-    maxWorkSpace = std::max(fwdLimitBytes_, bwdDataLimitBytes_);
-    maxWorkSpace = std::max(maxWorkSpace, bwdFilterLimitBytes_);
-    workSpaceInBytes_ = maxWorkSpace;
+  size_t maxWorkSpace = 0;
+  maxWorkSpace = std::max(fwdLimitBytes_, bwdDataLimitBytes_);
+  maxWorkSpace = std::max(maxWorkSpace, bwdFilterLimitBytes_);
+  workSpaceInBytes_ = maxWorkSpace;
 
-    VLOG(3) << getName() << " Fwd / BwdData / BwdFilter algo: " << fwdAlgo_
-            << " / " << bwdDataAlgo_ << " / " << bwdFilterAlgo_;
-  }
+  VLOG(3) << getName() << " Fwd / BwdData / BwdFilter algo: " << fwdAlgo_
+          << " / " << bwdDataAlgo_ << " / " << bwdFilterAlgo_;
+  // }
 
   isSelectAlgo_ = true;
 }
