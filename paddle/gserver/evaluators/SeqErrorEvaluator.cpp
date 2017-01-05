@@ -20,39 +20,28 @@ namespace paddle {
 /**
  * calculate sequence-to-sequence edit distance
  */
-class CTCErrorEvaluator : public Evaluator {
+class SeqErrorEvaluator : public Evaluator {
 private:
   MatrixPtr outActivations_;
-  int numTimes_, numClasses_, numSequences_, blank_;
+  int numTimes_, numSequences_;
+  std::vector<int> uncare_;
   real deletions_, insertions_, substitutions_;
   int seqClassficationError_;
 
-  std::vector<int> path2String(const std::vector<int>& path) {
+  std::vector<int> rmUncareCls(const std::vector<int>& path) {
     std::vector<int> str;
     str.clear();
-    int prevLabel = -1;
     for (std::vector<int>::const_iterator label = path.begin();
-         label != path.end();
-         label++) {
-      if (*label != blank_ &&
-          (str.empty() || *label != str.back() || prevLabel == blank_)) {
+         label != path.end(); label++) {
+      bool match_uncare = false;
+      for (unsigned int i = 0; i < uncare_.size(); ++i) {
+        match_uncare = match_uncare || (*label == uncare_[i]);
+      }
+      if (!match_uncare) {
         str.push_back(*label);
       }
-      prevLabel = *label;
     }
     return str;
-  }
-
-  std::vector<int> bestLabelSeq() {
-    std::vector<int> path;
-    path.clear();
-    real* acts = outActivations_->getData();
-    for (int i = 0; i < numTimes_; ++i) {
-      path.push_back(std::max_element(acts + i * numClasses_,
-                                      acts + (i + 1) * numClasses_) -
-                     (acts + i * numClasses_));
-    }
-    return path2String(path);
   }
 
   /* "sp, dp, ip" is the weighting parameter of "substitution, deletion,
@@ -169,28 +158,27 @@ private:
   }
 
   real editDistance(
-      real* output, int numTimes, int numClasses, int* labels, int labelsLen) {
+      int* output, int numTimes, int* labels, int labelsLen) {
     numTimes_ = numTimes;
-    numClasses_ = numClasses;
-    blank_ = numClasses_ - 1;
-    outActivations_ = Matrix::create(output, numTimes, numClasses);
     std::vector<int> recogStr, gtStr;
-    recogStr = bestLabelSeq();
+    for (int i = 0; i < numTimes; ++i) {
+      recogStr.push_back(output[i]);
+    }
     for (int i = 0; i < labelsLen; ++i) {
       gtStr.push_back(labels[i]);
     }
 
-    // std::vector<int> gtStrWithoutEOS = path2String(gtStr);
-    // return stringAlignment(gtStrWithoutEOS, recogStr);
-    return stringAlignment(gtStr, recogStr);
+    std::vector<int> gtStrWithoutUncare = rmUncareCls(gtStr);
+    std::vector<int> recogStrWithoutUncare = rmUncareCls(recogStr);
+
+    return stringAlignment(gtStrWithoutUncare, recogStrWithoutUncare);
   }
 
 public:
-  CTCErrorEvaluator()
+  SeqErrorEvaluator()
       : numTimes_(0),
-        numClasses_(0),
         numSequences_(0),
-        blank_(0),
+        uncare_(0),
         deletions_(0),
         insertions_(0),
         substitutions_(0),
@@ -204,6 +192,7 @@ public:
     hl_stream_synchronize(HPPL_STREAM_DEFAULT);
     CHECK(label.sequenceStartPositions);
     CHECK(label.ids);
+    CHECK(output.ids);
     size_t numSequences = label.sequenceStartPositions->getSize() - 1;
     const int* labelStarts = label.sequenceStartPositions->getData(false);
     const int* outputStarts = output.sequenceStartPositions->getData(false);
@@ -211,9 +200,8 @@ public:
     for (size_t i = 0; i < numSequences; ++i) {
       real err = 0;
       err = editDistance(
-          output.value->getData() + output.value->getWidth() * outputStarts[i],
+          output.ids->getData() + outputStarts[i],
           outputStarts[i + 1] - outputStarts[i],
-          output.value->getWidth(),
           label.ids->getData() + labelStarts[i],
           labelStarts[i + 1] - labelStarts[i]);
 
@@ -230,6 +218,10 @@ public:
     for (const std::string& name : config_.input_layers()) {
       arguments.push_back(nn.getLayer(name)->getOutput());
     }
+    uncare_.clear();
+    for (int i = 0; i < config_.uncare_size(); ++i) {
+      uncare_.push_back(config_.uncare(i));
+    }
   }
 
   virtual void updateSamplesNum(const std::vector<Argument>& arguments) {
@@ -239,7 +231,6 @@ public:
   virtual void start() {
     Evaluator::start();
     numSequences_ = 0;
-    blank_ = 0;
     deletions_ = 0;
     insertions_ = 0;
     substitutions_ = 0;
@@ -276,6 +267,6 @@ public:
   }
 };
 
-REGISTER_EVALUATOR(ctc_edit_distance, CTCErrorEvaluator);
+REGISTER_EVALUATOR(seq_error_evaluator, SeqErrorEvaluator);
 
 }  // namespace paddle

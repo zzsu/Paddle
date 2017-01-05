@@ -1267,7 +1267,8 @@ def Evaluator(
         dict_file=None,
         result_file=None,
         num_results=None,
-        delimited=None, ):
+        delimited=None,
+        uncare=None,):
     evaluator = g_config.model_config.evaluators.add()
     evaluator.type = type
     evaluator.name = MakeLayerNameInSubmodel(name)
@@ -1295,7 +1296,8 @@ def Evaluator(
         evaluator.num_results = num_results
     if delimited is not None:
         evaluator.delimited = delimited
-
+    if uncare is not None:
+        evaluator.uncare.extend(uncare)
 
 class LayerBase(object):
     def __init__(
