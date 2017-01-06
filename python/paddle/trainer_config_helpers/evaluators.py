@@ -16,12 +16,22 @@ from paddle.trainer.config_parser import *
 from default_decorators import *
 
 __all__ = [
-    "evaluator_base", "classification_error_evaluator", "auc_evaluator",
-    "pnpair_evaluator", "precision_recall_evaluator", "ctc_error_evaluator",
-    "chunk_evaluator", "sum_evaluator", "column_sum_evaluator",
-    "value_printer_evaluator", "gradient_printer_evaluator",
-    "maxid_printer_evaluator", "maxframe_printer_evaluator",
-    "seqtext_printer_evaluator", "classification_error_printer_evaluator"
+    "evaluator_base",
+    "classification_error_evaluator",
+    "auc_evaluator",
+    "pnpair_evaluator",
+    "precision_recall_evaluator",
+    "ctc_error_evaluator",
+    "chunk_evaluator",
+    "sum_evaluator",
+    "column_sum_evaluator",
+    "value_printer_evaluator",
+    "gradient_printer_evaluator",
+    "maxid_printer_evaluator",
+    "maxframe_printer_evaluator",
+    "seqtext_printer_evaluator",
+    "classification_error_printer_evaluator",
+    "seq_error_evaluator",
 ]
 
 
@@ -69,7 +79,8 @@ def evaluator_base(input,
                    dict_file=None,
                    result_file=None,
                    num_results=None,
-                   delimited=None):
+                   delimited=None,
+                   uncare=None):
     """
     Evaluator will evaluate the network status while training/testing.
 
@@ -112,6 +123,9 @@ def evaluator_base(input,
     if not isinstance(input, list):
         input = [input]
 
+    if uncare is not None and not isinstance(uncare, list):
+        uncare = [uncare]
+
     if label:
         input.append(label)
     if weight:
@@ -127,7 +141,8 @@ def evaluator_base(input,
         positive_label=positive_label,
         dict_file=dict_file,
         result_file=result_file,
-        delimited=delimited)
+        delimited=delimited,
+        uncare=uncare)
 
 
 @evaluator(EvaluatorAttribute.FOR_CLASSIFICATION)
@@ -667,3 +682,35 @@ def classification_error_printer_evaluator(
         input=input,
         label=label,
         classification_threshold=threshold)
+
+
+@evaluator(EvaluatorAttribute.FOR_CLASSIFICATION)
+@wrap_name_default()
+def seq_error_evaluator(
+        input,
+        label,
+        uncare=None,
+        name=None, ):
+    """
+    This evaluator is to calculate sequence-to-sequence edit distance.
+
+    The simple usage is :
+
+    .. code-block:: python
+
+       eval = seq_error_evaluator(input=input, label=lbl)
+
+    :param name: Evaluator name.
+    :type name: None|basestring
+    :param input: Input Layer. Should be the same as the input for ctc_layer.
+    :type input: LayerOutput
+    :param label: input label, which is a data_layer. Should be the same as the
+                  label for ctc_layer
+    :type label: LayerOutput
+    """
+    evaluator_base(
+        name=name,
+        type="seq_error_evaluator",
+        input=input,
+        label=label,
+        uncare=uncare)

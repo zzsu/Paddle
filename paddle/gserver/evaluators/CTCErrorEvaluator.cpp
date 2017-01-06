@@ -65,7 +65,7 @@ private:
                        real dp = 1.0,
                        real ip = 1.0) {
     std::vector<std::vector<int>> matrix;
-    int substitutions, deletions, insertions;
+    int substitutions = 0, deletions = 0, insertions = 0;
     real distance;
     int n = gtStr.size();
     int m = recogStr.size();
@@ -180,9 +180,7 @@ private:
       gtStr.push_back(labels[i]);
     }
 
-    std::vector<int> gtStrWithoutEOS = path2String(gtStr);
-    return stringAlignment(gtStrWithoutEOS, recogStr);
-    // return stringAlignment(gtStr, recogStr);
+    return stringAlignment(gtStr, recogStr);
   }
 
 public:
