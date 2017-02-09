@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+
 #pragma once
 
 #include <paddle/utils/PythonUtil.h>
@@ -24,8 +25,7 @@ namespace paddle {
 
 class PyDataProvider : public DataProvider {
 public:
-  PyDataProvider(const DataConfig& config,
-                 bool useGpu,
+  PyDataProvider(const DataConfig& config, bool useGpu,
                  bool loadDataAll = true);
 
   virtual void reset();
@@ -48,38 +48,43 @@ protected:
 
   void parseHeaderData(const std::string& headerData);
   void fillDenseSlot(ProtoSlot& slot, char*& data, const char* dataEnd);
-  void fillSparseNonValueSlot(ProtoSlot& slot,
-                              char*& data,
+  void fillSparseNonValueSlot(ProtoSlot& slot, char*& data,
                               const char* dataEnd);
   void fillSparseValueSlot(ProtoSlot& slot, char*& data, const char* dataEnd);
   void fillIndexSlot(ProtoSlot& slot, char*& data, const char* dataEnd);
   void fillStringSlot(ProtoSlot& slot, char*& data, const char* dataEnd);
+  void fillVarMDimDenseSlot(ProtoSlot& slot, char*& data, const char* dataEnd);
+  void fillVarIndexSlot(ProtoSlot& slot, char*& data, const char* dataEnd);
   void fillSlotsByStr(const std::string& samples);
-  void handleDenseSlot(ProtoSlot& slot,
-                       size_t slotIndex,
+  void handleDenseSlot(ProtoSlot& slot, size_t slotIndex,
                        std::vector<Argument>& cpuArguments);
-  void handleSparseNonValueSlot(ProtoSlot& slot,
-                                size_t slotIndex,
+  void handleSparseNonValueSlot(ProtoSlot& slot, size_t slotIndex,
                                 std::vector<Argument>& cpuArguments);
-  void handleSparseValueSlot(ProtoSlot& slot,
-                             size_t slotIndex,
+  void handleSparseValueSlot(ProtoSlot& slot, size_t slotIndex,
                              std::vector<Argument>& cpuArguments);
-  void handleIndexSlot(ProtoSlot& slot,
-                       size_t slotIndex,
+  void handleIndexSlot(ProtoSlot& slot, size_t slotIndex,
                        std::vector<Argument>& cpuArguments);
-  void handleStringSlot(ProtoSlot& slot,
-                        size_t slotIndex,
+  void handleStringSlot(ProtoSlot& slot, size_t slotIndex,
                         std::vector<Argument>& cpuArguments);
+  void handleVarMDimDenseSlot(ProtoSlot& slot, size_t slotIndex,
+         std::vector<Argument>& cpuArguments);
+  void handleVarIndexSlot(ProtoSlot& slot, size_t slotIndex,
+         std::vector<Argument>& cpuArguments);
   void resetSlots();
   void loadData(const std::vector<std::string>& fileList);
 
 protected:
+  struct ProtoVarSlot {
+    std::vector<real> data;
+    std::vector<int> dims;
+  };
   struct ProtoSlot {
     SlotDef::SlotType type;
     int dim;
     unsigned int sampleNum;
     unsigned int sequenceNum;
     unsigned int subSequenceNum;
+    unsigned int dimsNum;
     // Store the data of index type slot
     std::vector<int> indexData;
     // Store the data of dense type slot
@@ -90,6 +95,10 @@ protected:
     std::vector<sparse_float_value_t> sparseFloatValueData;
     // Used to store the index of each sample in slot values
     std::vector<int64_t> indices;
+    // Store the data of multi-dim slot
+    std::vector<ProtoVarSlot>  varDenseData;
+    // Store the index of variable size
+    std::vector<std::vector<int>> varIndices;
     // The starting position of each sequence in samples
     // The last element should be the number of samples
     // If empty, each sample is one sequence.
