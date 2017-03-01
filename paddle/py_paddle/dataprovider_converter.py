@@ -1,4 +1,4 @@
-# Copyright (c) 2016 Baidu, Inc. All Rights Reserved
+# Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 import paddle.trainer.PyDataProvider2 as dp2
 import collections
 import swig_paddle
+import numpy
 
 __all__ = ['DataProviderConverter']
 
@@ -33,20 +34,26 @@ class IScanner(object):
 
 
 class DenseScanner(IScanner):
+    """
+    :type __mat__: numpy.ndarray
+    """
+
     def __init__(self, input_type, pos):
         IScanner.__init__(self, input_type, pos)
-        self.__mat__ = []
-        self.__height__ = 0
+        self.__mat__ = None
 
     def scan(self, dat):
-        self.__mat__.extend(dat)
-        self.__height__ += 1
+        if self.__mat__ is None:
+            self.__mat__ = numpy.array([dat], dtype='float32')
+        else:
+            self.__mat__ = numpy.append(self.__mat__, [dat], axis=0)
 
     def finish_scan(self, argument):
         assert isinstance(argument, swig_paddle.Arguments)
         assert isinstance(self.input_type, dp2.InputType)
-        m = swig_paddle.Matrix.createDense(self.__mat__, self.__height__,
-                                           self.input_type.dim, False)
+        if self.__mat__.dtype != numpy.float32:
+            self.__mat__ = self.__mat__.astype(numpy.float32)
+        m = swig_paddle.Matrix.createDenseFromNumpy(self.__mat__, True, False)
         argument.setSlotValue(self.pos, m)
 
 

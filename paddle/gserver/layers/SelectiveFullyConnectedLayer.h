@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -65,9 +65,10 @@ public:
       : Layer(config), selCols_(nullptr) {}
 
   ~SelectiveFullyConnectedLayer() {}
-  void prefetch();
+  void prefetch() override;
 
-  bool init(const LayerMap& layerMap, const ParameterMap& parameterMap);
+  bool init(const LayerMap& layerMap,
+            const ParameterMap& parameterMap) override;
 
   Weight& getWeight(int idx) { return *weights_[idx]; }
 
@@ -90,8 +91,8 @@ public:
   void fillSelectiveData(
       const std::shared_ptr<std::vector<std::pair<int*, size_t>>>& candidates);
 
-  void forward(PassType passType);
-  void backward(const UpdateCallback& callback = nullptr);
+  void forward(PassType passType) override;
+  void backward(const UpdateCallback& callback = nullptr) override;
 
 private:
   /**

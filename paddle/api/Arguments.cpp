@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -135,6 +135,10 @@ IVector* Arguments::getSlotSequenceDim(size_t idx) const throw(RangeError) {
 void Arguments::setSlotSequenceDim(size_t idx, IVector* vec) throw(RangeError) {
   auto& a = m->getArg(idx);
   a.cpuSequenceDims = m->cast<paddle::IVector>(vec->getSharedPtr());
+}
+
+float Arguments::sumCosts() const {
+  return paddle::Argument::sumCosts(m->outputs);
 }
 
 int64_t Arguments::getBatchSize(size_t idx) const throw(RangeError) {

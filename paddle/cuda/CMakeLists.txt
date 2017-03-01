@@ -15,7 +15,6 @@ else()
 endif()
 
 set(CUDA_CXX_WITH_GPU_SOURCES
-    src/hl_cudart_wrap.cc
     src/hl_cuda_cublas.cc
     src/hl_cuda_cudnn.cc
     src/hl_cuda_device.cc)
@@ -33,9 +32,6 @@ else()
         src/hl_dso_loader.cc
         src/hl_warpctc_wrap.cc)
 endif()
-
-set_source_files_properties(${AVX_SOURCES}
-                            PROPERTIES COMPILE_FLAGS "-mavx")
 
 set(CUDA_CU_SOURCES
     src/hl_perturbation_util.cu
@@ -90,6 +86,8 @@ else()
                 ${CUDA_SOURCES}
                 ${CUDA_CXX_SOURCES})
 endif()
+
+add_dependencies(paddle_cuda ${external_project_dependencies})
 
 add_style_check_target(paddle_cuda
                        ${CUDA_SOURCES}

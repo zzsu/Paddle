@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,10 +28,10 @@ limitations under the License. */
  * so we can add some tricks to prevent exp calculate an excessive value.
  *
  */
-#include <fenv.h>
+
 #include <gtest/gtest.h>
 #include "paddle/math/Matrix.h"
-#include "paddle/utils/Excepts.h"
+#include "paddle/utils/Common.h"
 
 using namespace paddle;  // NOLINT
 

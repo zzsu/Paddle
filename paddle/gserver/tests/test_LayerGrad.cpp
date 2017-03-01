@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,20 +17,20 @@ limitations under the License. */
 #include <vector>
 #include "ModelConfig.pb.h"
 #include "paddle/gserver/layers/DataLayer.h"
-#include "paddle/trainer/Trainer.h"
 #include "paddle/math/MathUtils.h"
+#include "paddle/trainer/Trainer.h"
 
 #include "LayerGradUtil.h"
-#include "TestUtil.h"
+#include "paddle/testing/TestUtil.h"
 
 using namespace paddle;  // NOLINT
 using namespace std;     // NOLINT
 
-P_DECLARE_bool(use_gpu);
-P_DECLARE_int32(gpu_id);
-P_DECLARE_double(checkgrad_eps);
-P_DECLARE_bool(thread_local_rand_use_global_seed);
-P_DECLARE_bool(prev_batch_state);
+DECLARE_bool(use_gpu);
+DECLARE_int32(gpu_id);
+DECLARE_double(checkgrad_eps);
+DECLARE_bool(thread_local_rand_use_global_seed);
+DECLARE_bool(prev_batch_state);
 
 TEST(Operator, dot_mul) {
   TestConfig config;
@@ -310,7 +310,11 @@ TEST(Layer, CTCLayer) {
   config.layerConfig.add_inputs();
 
   for (auto useGpu : {false, true}) {
-    testLayerGrad(config, "ctc", 100, /* trans */ false, /* useGpu */ useGpu);
+    testLayerGrad(config,
+                  "ctc",
+                  100,
+                  /* trans */ false, /* useGpu */
+                  useGpu);
   }
 }
 
@@ -587,7 +591,11 @@ TEST(Layer, hsigmoidLayer) {
   config.layerConfig.add_inputs();
 
   // Not support GPU now
-  testLayerGrad(config, "hsigmoid", 100, /* trans */ false, /* useGpu */ false);
+  testLayerGrad(config,
+                "hsigmoid",
+                100,
+                /* trans */ false, /* useGpu */
+                false);
 }
 
 TEST(Layer, multi_cross) {
@@ -1021,11 +1029,14 @@ void testNormLayer(const string& normType, bool trans, bool useGpu) {
   testLayerGrad(config, "norm", 100, trans, useGpu);
 }
 
-#ifndef PADDLE_ONLY_CPU
 TEST(Layer, NormLayer) {
-  testNormLayer("cmrnorm-projection", /* trans= */ false, /* useGpu= */ true);
+  testNormLayer("cmrnorm-projection",
+                /* trans= */ false, /* useGpu= */
+                true);
+  testNormLayer("cmrnorm-projection",
+                /* trans= */ false, /* useGpu= */
+                false);
 }
-#endif
 
 void setPoolConfig(TestConfig* config,
                    PoolConfig* pool,
@@ -1305,6 +1316,25 @@ TEST(Layer, ResizeLayer) {
   }
 }
 
+TEST(Layer, RotateLayer) {
+  TestConfig config;
+  config.biasSize = 0;
+  config.layerConfig.set_type("rotate");
+  const int CHANNEL = 2;
+  const int HEIGHT = 8;
+  const int WIDTH = 4;
+  const int INPUT_SIZE = HEIGHT * WIDTH * CHANNEL;
+  config.layerConfig.set_size(INPUT_SIZE);
+  config.layerConfig.set_height(HEIGHT);
+  config.layerConfig.set_width(WIDTH);
+  config.inputDefs.push_back({INPUT_DATA, "layer_0", INPUT_SIZE, 0});
+  config.layerConfig.add_inputs();
+
+  for (auto useGpu : {false, true}) {
+    testLayerGrad(config, "rotate", 100, false, useGpu);
+  }
+}
+
 TEST(Layer, NCELayer) {
   TestConfig config;
   size_t numClasses = 4;
@@ -1561,6 +1591,35 @@ TEST(Layer, MultiplexLayer) {
 
   for (auto useGpu : {false, true}) {
     testLayerGrad(config, "multiplex", 512, /* trans= */ false, useGpu);
+  }
+}
+
+TEST(Layer, PadLayer) {
+  TestConfig config;
+  config.biasSize = 0;
+  config.layerConfig.set_type("pad");
+
+  int c = 4;
+  int h = 31;
+  int w = 36;
+  size_t size = c * h * w;
+  config.inputDefs.push_back({INPUT_DATA, "layer_0", size, 0});
+  LayerInputConfig* input = config.layerConfig.add_inputs();
+  PadConfig* pad = input->mutable_pad_conf();
+  ImageConfig* image = pad->mutable_image_conf();
+
+  image->set_channels(c);
+  image->set_img_size(h);
+  image->set_img_size_y(w);
+  pad->add_pad_c(1);
+  pad->add_pad_c(2);
+  pad->add_pad_h(2);
+  pad->add_pad_h(3);
+  pad->add_pad_w(3);
+  pad->add_pad_w(5);
+
+  for (auto useGpu : {false, true}) {
+    testLayerGrad(config, "pad", 10, false, useGpu);
   }
 }
 

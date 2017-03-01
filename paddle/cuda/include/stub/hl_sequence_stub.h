@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,35 +26,6 @@ inline void hl_max_sequence_forward(real* input,
 
 inline void hl_max_sequence_backward(
     real* outputGrad, int* index, real* inputGrad, int numSequences, int dim) {}
-
-inline void hl_context_projection_forward(real* input,
-                                          const int* sequence,
-                                          real* weightData,
-                                          real* output,
-                                          int numSequences,
-                                          int inputDim,
-                                          int contextLength,
-                                          int contextStart,
-                                          int beginPad,
-                                          bool isPadding) {}
-
-inline void hl_context_projection_backward_data(real* outputGrad,
-                                                const int* sequence,
-                                                real* inputGrad,
-                                                int numSequences,
-                                                int inputDim,
-                                                int contextLength,
-                                                int contextStart) {}
-
-inline void hl_context_projection_backward_weight(real* outputGrad,
-                                                  const int* sequence,
-                                                  real* weightGrad,
-                                                  int numSequences,
-                                                  int weightDim,
-                                                  int totalPad,
-                                                  int contextLength,
-                                                  int contextStart,
-                                                  int beginPad) {}
 
 inline void hl_sequence2batch_copy(real* batch,
                                    real* sequence,

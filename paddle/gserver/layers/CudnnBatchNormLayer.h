@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@ limitations under the License. */
 
 #pragma once
 
-#include "paddle/utils/Stat.h"
-#include "Layer.h"
 #include "BatchNormBaseLayer.h"
+#include "Layer.h"
+#include "paddle/utils/Stat.h"
 
 namespace paddle {
 
@@ -35,14 +35,15 @@ public:
 
   ~CudnnBatchNormLayer();
 
-  bool init(const LayerMap& layerMap, const ParameterMap& parameterMap);
+  bool init(const LayerMap& layerMap,
+            const ParameterMap& parameterMap) override;
   /**
    * reshape tensor of ioDesc_.
    */
   void reshape(int batchSize);
 
-  void forward(PassType passType);
-  void backward(const UpdateCallback& callback = nullptr);
+  void forward(PassType passType) override;
+  void backward(const UpdateCallback& callback = nullptr) override;
 
 protected:
   /**

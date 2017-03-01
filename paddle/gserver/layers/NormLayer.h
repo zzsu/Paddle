@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@ limitations under the License. */
 
 #include <vector>
 #include "Layer.h"
-#include "paddle/math/Matrix.h"
 #include "NormLayer.h"
+#include "paddle/math/Matrix.h"
 
 namespace paddle {
 
@@ -30,7 +30,8 @@ class NormLayer : public Layer {
 public:
   explicit NormLayer(const LayerConfig& config) : Layer(config) {}
 
-  bool init(const LayerMap& layerMap, const ParameterMap& parameterMap) {
+  bool init(const LayerMap& layerMap,
+            const ParameterMap& parameterMap) override {
     Layer::init(layerMap, parameterMap);
     return true;
   }
@@ -50,15 +51,16 @@ public:
 class ResponseNormLayer : public NormLayer {
 protected:
   size_t channels_, size_, outputX_, imgSize_, outputY_, imgSizeY_;
-  float scale_, pow_;
+  real scale_, pow_;
   MatrixPtr denoms_;
 
 public:
   explicit ResponseNormLayer(const LayerConfig& config) : NormLayer(config) {}
 
-  bool init(const LayerMap& layerMap, const ParameterMap& parameterMap);
-  void forward(PassType passType) { LOG(FATAL) << "Not implemented"; }
-  void backward(const UpdateCallback& callback = nullptr) {
+  bool init(const LayerMap& layerMap,
+            const ParameterMap& parameterMap) override;
+  void forward(PassType passType) override { LOG(FATAL) << "Not implemented"; }
+  void backward(const UpdateCallback& callback = nullptr) override {
     LOG(FATAL) << "Not implemented";
   }
 };

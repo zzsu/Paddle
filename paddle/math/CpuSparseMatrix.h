@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -136,7 +136,7 @@ public:
     return sum;
   }
 
-  virtual void square() {
+  virtual void square2() {
     CHECK(isContiguous());
     if (valueType_ == NO_VALUE) {
       return;
@@ -201,9 +201,9 @@ public:
   void zeroMem();
 
   /// mem MUST be alloced outside (memAlloc=false)
-  void transpose(MatrixPtr matTrans, bool memAlloc);
+  void transpose(MatrixPtr& matTrans, bool memAlloc);
 
-  void mul(MatrixPtr A, MatrixPtr B, real alpha, real beta);
+  void mul(const Matrix& A, const Matrix& B, real alpha, real beta);
 
   /**
    * @brief sparseMatrix += denseMatrix

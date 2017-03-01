@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@ limitations under the License. */
 
 #pragma once
 
-#include "paddle/utils/Stat.h"
 #include "Layer.h"
+#include "paddle/utils/Stat.h"
 
 namespace paddle {
 
@@ -52,7 +52,8 @@ public:
    */
   static Layer* create(const LayerConfig& config);
 
-  virtual bool init(const LayerMap& layerMap, const ParameterMap& parameterMap);
+  bool init(const LayerMap& layerMap,
+            const ParameterMap& parameterMap) override;
 
   /**
    * @brief Calculate feature map size. Some input uses frameHeight and

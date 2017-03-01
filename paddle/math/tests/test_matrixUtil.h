@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,17 @@ void checkMatrixEqual(const MatrixPtr& a, const MatrixPtr& b) {
     for (size_t c = 0; c < a->getWidth(); ++c) {
       ASSERT_FLOAT_EQ(a->getElement(r, c), b->getElement(r, c));
     }
+  }
+}
+
+void checkSMatrixEqual(const CpuSparseMatrix& a, const CpuSparseMatrix& b) {
+  ASSERT_EQ(a.getWidth(), b.getWidth());
+  ASSERT_EQ(a.getHeight(), b.getHeight());
+  ASSERT_EQ(a.isTransposed(), b.isTransposed());
+  ASSERT_EQ(a.getFormat(), b.getFormat());
+  ASSERT_EQ(a.getElementCnt(), b.getElementCnt());
+  for (size_t r = 0; r < a.getElementCnt(); ++r) {
+    ASSERT_FLOAT_EQ(a.getValue()[r], b.getValue()[r]);
   }
 }
 
@@ -69,6 +80,36 @@ void checkSMatrixEqual2(const CpuSparseMatrixPtr& a,
     }
     for (size_t r = 0; r <= a->getWidth(); r++) {
       ASSERT_EQ(a->getCols()[r], b->getCols()[r]);
+    }
+  }
+}
+
+void checkSMatrixEqual2Dense(const CpuSparseMatrix& a, const CpuMatrix& b) {
+  ASSERT_EQ(a.getWidth(), b.getWidth());
+  ASSERT_EQ(a.getHeight(), b.getHeight());
+  ASSERT_EQ(a.isTransposed(), b.isTransposed());
+
+  if (a.getFormat() == SPARSE_CSC) {
+    int* rows = a.getRows();
+    for (size_t i = 0; i < a.getWidth(); i++) {
+      for (size_t j = a.getColStartIdx(i); j < a.getColStartIdx(i + 1); j++) {
+        if (a.getValueType() == FLOAT_VALUE) {
+          ASSERT_FLOAT_EQ(a.getValue()[j], b.getElement(rows[j], i));
+        } else {
+          ASSERT_FLOAT_EQ(1.0, b.getElement(rows[j], i));
+        }
+      }
+    }
+  } else {
+    int* cols = a.getCols();
+    for (size_t i = 0; i < a.getHeight(); i++) {
+      for (size_t j = a.getRowStartIdx(i); j < a.getRowStartIdx(i + 1); j++) {
+        if (a.getValueType() == FLOAT_VALUE) {
+          ASSERT_FLOAT_EQ(a.getValue()[j], b.getElement(i, cols[j]));
+        } else {
+          ASSERT_FLOAT_EQ(1.0, b.getElement(i, cols[j]));
+        }
+      }
     }
   }
 }

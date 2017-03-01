@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,15 +12,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include <gtest/gtest.h>
 #include <chrono>
 
-#include "paddle/utils/CustomStackTrace.h"
-#include "paddle/utils/CommandLineParser.h"
-#include "paddle/utils/Util.h"
-#include "paddle/utils/Locks.h"
+#include <gflags/gflags.h>
+#include <gtest/gtest.h>
 
-P_DEFINE_int32(test_thread_num, 10, "testing thread number");
+#include "paddle/utils/CustomStackTrace.h"
+#include "paddle/utils/Locks.h"
+#include "paddle/utils/Util.h"
+
+DEFINE_int32(test_thread_num, 10, "testing thread number");
 
 void testNormalImpl(
     const std::function<void(paddle::CustomStackTrace<std::string>&,
@@ -94,10 +95,4 @@ TEST(CustomStackTrace, normalTest) {
       finish.wait();
     }
   });
-}
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  paddle::initMain(argc, argv);
-  return RUN_ALL_TESTS();
 }

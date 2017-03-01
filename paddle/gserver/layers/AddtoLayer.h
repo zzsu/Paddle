@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,19 +44,20 @@ public:
   /**
    * Intialization of AddtoLayer.
    */
-  bool init(const LayerMap& layerMap, const ParameterMap& parameterMap);
+  bool init(const LayerMap& layerMap,
+            const ParameterMap& parameterMap) override;
 
   /**
    * Forward propagation.
    * @note There is no weight matrix for each input,
    *       because it just a simple add operation.
    */
-  void forward(PassType passType);
+  void forward(PassType passType) override;
 
   /**
    * Backward propagation.
    */
-  void backward(const UpdateCallback& callback = nullptr);
+  void backward(const UpdateCallback& callback = nullptr) override;
 };
 
 }  // namespace paddle

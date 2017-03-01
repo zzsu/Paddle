@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@ limitations under the License. */
 #ifndef HL_WARPCTC_WRAP_H_
 #define HL_WARPCTC_WRAP_H_
 
+#include "ctc.h"
 #include "hl_base.h"
-#include "warp-ctc/include/ctc.h"
 
 typedef ctcStatus_t hl_warpctc_status_t;
 typedef ctcOptions hl_warpctc_options_t;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -274,6 +274,18 @@ real GpuMatrix::getSum() {
   return sum;
 }
 
+real GpuMatrix::getMin() {
+  CHECK(isContiguous());
+  auto vec = GpuVector(height_ * width_, data_);
+  return vec.getMin();
+}
+
+real GpuMatrix::getMax() {
+  CHECK(isContiguous());
+  auto vec = GpuVector(height_ * width_, data_);
+  return vec.getMax();
+}
+
 void GpuMatrix::accumulateColSum(Matrix& src) {
   CHECK_EQ(getWidth(), src.getWidth());
   CHECK_EQ(getHeight(), (size_t)1);
@@ -371,11 +383,13 @@ MatrixPtr GpuMatrix::getTranspose() {
   }
 }
 
-void GpuMatrix::transpose(MatrixPtr matTrans, bool memAlloc) {
+void GpuMatrix::transpose(MatrixPtr& matTrans, bool memAlloc) {
   if (memAlloc) {
     matTrans = std::make_shared<GpuMatrix>(width_, height_);
   } else {
     CHECK(matTrans != NULL);
+    CHECK_EQ(matTrans->getHeight(), width_);
+    CHECK_EQ(matTrans->getWidth(), height_);
   }
   real* dataTrans = matTrans->getData();
   real* data = getData();
@@ -385,13 +399,27 @@ void GpuMatrix::transpose(MatrixPtr matTrans, bool memAlloc) {
   hl_matrix_transpose(data, dataTrans, height_, width_, lda, ldc);
 }
 
+void GpuMatrix::rotate(MatrixPtr& matRot, bool memAlloc, bool clockWise) {
+  if (memAlloc) {
+    matRot = std::make_shared<GpuMatrix>(width_, height_);
+  } else {
+    CHECK(matRot != NULL);
+    CHECK_EQ(matRot->getHeight(), width_);
+    CHECK_EQ(matRot->getWidth(), height_);
+  }
+
+  real* dataRot = matRot->getData();
+  real* data = getData();
+  hl_matrix_rotate(data, dataRot, height_, width_, clockWise);
+}
+
 MatrixPtr GpuMatrix::getInverse() {
   MatrixPtr matInv;
   inverse(matInv, true);
   return matInv;
 }
 
-void GpuMatrix::inverse(MatrixPtr matInv, bool memAlloc) {
+void GpuMatrix::inverse(MatrixPtr& matInv, bool memAlloc) {
   CHECK_EQ(height_, width_);
 
   if (memAlloc) {
@@ -582,18 +610,16 @@ void GpuMatrix::mul(const GpuMatrix& a,
 }
 
 /* this = a*b */
-void GpuMatrix::mul(const MatrixPtr a, const MatrixPtr b) {
-  mul(a, b, 1.0, 0.0);
-}
+void GpuMatrix::mul(const Matrix& a, const Matrix& b) { mul(a, b, 1.0, 0.0); }
 
-void GpuMatrix::mul(const MatrixPtr a,
-                    const MatrixPtr b,
+void GpuMatrix::mul(const Matrix& a,
+                    const Matrix& b,
                     real scaleAB,
                     real scaleT) {
-  GpuMatrixPtr a_ptr = std::dynamic_pointer_cast<GpuMatrix>(a);
-  GpuMatrixPtr b_ptr = std::dynamic_pointer_cast<GpuMatrix>(b);
-  GpuSparseMatrixPtr a_ptr_s = std::dynamic_pointer_cast<GpuSparseMatrix>(a);
-  GpuSparseMatrixPtr b_ptr_s = std::dynamic_pointer_cast<GpuSparseMatrix>(b);
+  const auto a_ptr = dynamic_cast<const GpuMatrix*>(&a);
+  const auto b_ptr = dynamic_cast<const GpuMatrix*>(&b);
+  const auto a_ptr_s = dynamic_cast<const GpuSparseMatrix*>(&a);
+  const auto b_ptr_s = dynamic_cast<const GpuSparseMatrix*>(&b);
 
   if (a_ptr && b_ptr) {
     mul(*a_ptr, *b_ptr, scaleAB, scaleT);
@@ -766,20 +792,19 @@ void GpuMatrix::maxoutBackward(Matrix& a,
 }
 
 /*calulate the error of classification */
-void GpuMatrix::classificationError(MatrixPtr output, IVectorPtr label) {
-  GpuMatrixPtr output_ptr = std::dynamic_pointer_cast<GpuMatrix>(output);
-  GpuIVectorPtr label_ptr = std::dynamic_pointer_cast<GpuIVector>(label);
-
+void GpuMatrix::classificationError(Matrix& output, IVector& label) {
+  auto output_ptr = dynamic_cast<const GpuMatrix*>(&output);
+  auto label_ptr = dynamic_cast<const GpuIVector*>(&label);
   CHECK(output_ptr && label_ptr) << "Invalid argument pointer";
 
   CHECK(height_ == output_ptr->height_ && width_ == 1)
       << "Matrix dimensions are not equal";
-  real* output_d = output_ptr->data_;
-  real* recResult_d = data_;
-  int* label_d = label_ptr->getData();
 
-  hl_matrix_classification_error(
-      output_d, label_d, recResult_d, height_, output_ptr->width_);
+  hl_matrix_classification_error((real*)output_ptr->data_,
+                                 (int*)label_ptr->getData(),
+                                 data_,
+                                 height_,
+                                 output_ptr->width_);
 }
 
 /* copy -log(output[i * width + label]) to this->data[i] */
@@ -915,59 +940,6 @@ void GpuMatrix::softreluDerivative(Matrix& output) {
 
 void GpuMatrix::scaledTanh(Matrix& output, real p1, real p2) {
   BaseMatrix::scaledTanh(output, p1, p2);
-}
-void GpuMatrix::cosSim(Matrix& output1, Matrix& output2, real scale) {
-  CHECK(output1.useGpu_ == true && output2.useGpu_ == true)
-      << "Matrix type are not equal";
-  size_t numSamples = getHeight();
-  size_t dim = output1.getWidth();
-  CHECK_EQ(getWidth(), 1UL);
-  CHECK_EQ(output1.getHeight(), numSamples);
-  CHECK_EQ(output1.getWidth(), output2.getWidth());
-  real* out = getData();
-  real* x = output1.getData();
-  real* y = output2.getData();
-  hl_cossim(out, x, y, dim, output1.getHeight(), output2.getHeight(), scale);
-}
-void GpuMatrix::cosSimDerivative(Matrix& output,
-                                 Matrix& prevOut1,
-                                 Matrix& prevOut2,
-                                 Matrix& prevGrad1,
-                                 Matrix& prevGrad2,
-                                 real scale) {
-  CHECK(output.useGpu_ == true && prevOut1.useGpu_ == true &&
-        prevOut2.useGpu_ == true && prevGrad1.useGpu_ == true &&
-        prevGrad2.useGpu_ == true)
-      << "Matrix type are not equal";
-  CHECK_EQ(getWidth(), 1UL);
-  CHECK_EQ(output.getWidth(), 1UL);
-
-  size_t numSamples = getHeight();
-  CHECK_EQ(output.getHeight(), numSamples);
-  CHECK_EQ(prevOut1.getHeight(), numSamples);
-  CHECK_EQ(prevGrad1.getHeight(), numSamples);
-
-  size_t dim = prevOut1.getWidth();
-  CHECK_EQ(prevOut2.getWidth(), dim);
-  CHECK_EQ(prevGrad1.getWidth(), dim);
-  CHECK_EQ(prevGrad2.getWidth(), dim);
-
-  real* grad = getData();
-  real* out = output.getData();
-  real* prevOutX = prevOut1.getData();
-  real* prevOutY = prevOut2.getData();
-  real* prevGradX = prevGrad1.getData();
-  real* prevGradY = prevGrad2.getData();
-  hl_cossim_derivative(grad,
-                       out,
-                       prevOutX,
-                       prevOutY,
-                       prevGradX,
-                       prevGradY,
-                       dim,
-                       prevOut1.getHeight(),
-                       prevOut2.getHeight(),
-                       scale);
 }
 
 void GpuMatrix::randomizeUniform() {
@@ -1265,69 +1237,6 @@ void GpuMatrix::avgPoolBackward(Matrix& outGrad,
                       outGrad.getStride());
 }
 
-void GpuMatrix::crossMapNormalFwd(Matrix& input,
-                                  size_t imgSizeH,
-                                  size_t imgSizeW,
-                                  Matrix& denoms,
-                                  size_t channels,
-                                  size_t sizeX,
-                                  float scale,
-                                  float pow) {
-  size_t num = input.getHeight();
-  size_t height = imgSizeH;
-  size_t width = imgSizeW;
-
-  CHECK(height * width * channels == input.getWidth());
-  CHECK(denoms.getHeight() == input.getHeight() &&
-        denoms.getWidth() == input.getWidth() && input.getHeight() == height_ &&
-        input.getWidth() == width_);
-  hl_CMRNorm_forward(num,
-                     input.getData(),
-                     denoms.getData(),
-                     data_,
-                     channels,
-                     height,
-                     width,
-                     sizeX,
-                     scale,
-                     -pow);
-}
-
-void GpuMatrix::crossMapNormalBwd(Matrix& localGrad,
-                                  Matrix& denoms,
-                                  Matrix& preOutV,
-                                  Matrix& localOutV,
-                                  size_t channels,
-                                  size_t imgSizeH,
-                                  size_t imgSizeW,
-                                  size_t sizeX,
-                                  float scale,
-                                  float pow) {
-  size_t num = preOutV.getHeight();
-  size_t height = imgSizeH;
-  size_t width = imgSizeW;
-
-  CHECK(width * height * channels == preOutV.getWidth());
-  CHECK(denoms.getHeight() == preOutV.getHeight() &&
-        denoms.getWidth() == preOutV.getWidth() &&
-        preOutV.getHeight() == height_ && preOutV.getWidth() == width_);
-  CHECK(denoms.getHeight() == localGrad.getHeight() &&
-        denoms.getWidth() == localGrad.getWidth());
-
-  hl_CMRNorm_backward(num,
-                      preOutV.getData(),
-                      denoms.getData(),
-                      localOutV.getData(),
-                      localGrad.getData(),
-                      data_,
-                      channels,
-                      height,
-                      width,
-                      sizeX,
-                      -pow,
-                      2.0f * pow * scale);
-}
-
 void GpuMatrix::maxSequenceForward(Matrix& input,
                                    const IVector& sequence,
                                    IVector& index) {
@@ -1370,92 +1279,6 @@ void GpuMatrix::maxSequenceBackward(Matrix& outputGrad,
   hl_max_sequence_backward(outGrad, maxIndex, inputGrad, numSequences, dim);
 }
 
-void GpuMatrix::contextProjectionForward(MatrixPtr input,
-                                         MatrixPtr weight,
-                                         const IVector& sequence,
-                                         int contextLength,
-                                         int contextStart,
-                                         size_t beginPad,
-                                         bool isPadding) {
-  CHECK(dynamic_cast<GpuMatrix*>(input.get()));
-  CHECK(dynamic_cast<const GpuIVector*>(&sequence));
-  if (weight) CHECK(dynamic_cast<GpuMatrix*>(weight.get()));
-
-  size_t numSequences = sequence.getSize() - 1;
-  int64_t inputDim = input->getWidth();
-  int64_t dim = getWidth();
-  CHECK_EQ(dim, inputDim * contextLength);
-
-  real* outData = getData();
-  real* inputData = input->getData();
-  const int* starts = sequence.getData();
-
-  hl_context_projection_forward(inputData,
-                                starts,
-                                isPadding ? weight->getData() : NULL,
-                                outData,
-                                numSequences,
-                                inputDim,
-                                contextLength,
-                                contextStart,
-                                beginPad,
-                                isPadding);
-}
-
-void GpuMatrix::contextProjectionBackwardData(MatrixPtr inputGrad,
-                                              const IVector& sequence,
-                                              int contextLength,
-                                              int contextStart) {
-  CHECK(dynamic_cast<GpuMatrix*>(inputGrad.get()));
-  CHECK(dynamic_cast<const GpuIVector*>(&sequence));
-
-  size_t numSequences = sequence.getSize() - 1;
-  int64_t inputDim = inputGrad->getWidth();
-  int64_t dim = getWidth();
-  CHECK_EQ(dim, inputDim * contextLength);
-
-  real* outGrad = getData();
-  real* inGrad = inputGrad->getData();
-  const int* starts = sequence.getData();
-
-  hl_context_projection_backward_data(outGrad,
-                                      starts,
-                                      inGrad,
-                                      numSequences,
-                                      inputDim,
-                                      contextLength,
-                                      contextStart);
-}
-
-void GpuMatrix::contextProjectionBackwardWeight(MatrixPtr weightGrad,
-                                                const IVector& sequence,
-                                                int contextLength,
-                                                int contextStart,
-                                                int totalPad,
-                                                size_t beginPad) {
-  CHECK(dynamic_cast<GpuMatrix*>(weightGrad.get()));
-  CHECK(dynamic_cast<const GpuIVector*>(&sequence));
-
-  size_t numSequences = sequence.getSize() - 1;
-  int64_t weightDim = weightGrad->getWidth();
-  int64_t dim = getWidth();
-  CHECK_EQ(dim, weightDim * contextLength);
-
-  real* outGrad = getData();
-  real* wtGrad = weightGrad->getData();
-  const int* starts = sequence.getData();
-
-  hl_context_projection_backward_weight(outGrad,
-                                        starts,
-                                        wtGrad,
-                                        numSequences,
-                                        weightDim,
-                                        totalPad,
-                                        contextLength,
-                                        contextStart,
-                                        beginPad);
-}
-
 void GpuMatrix::paramReluForward(Matrix& data, Matrix& W) {
   CHECK(data.useGpu_ == true && W.useGpu_ == true)
       << "Matrix type are not equal";
@@ -1463,7 +1286,9 @@ void GpuMatrix::paramReluForward(Matrix& data, Matrix& W) {
   real* w = W.getData();
   size_t numElements = data.getWidth();
   size_t numSamples = data.getHeight();
-  size_t partial_sum = numElements / (W.getHeight() * W.getWidth());
+  size_t paraSize = W.getHeight() * W.getWidth();
+  CHECK(!(numElements % paraSize));  // this check from ParameterReluLayer::init
+  size_t partial_sum = numElements / paraSize;
   real* output = getData();
   hl_param_relu_forward(output, input, w, numElements, numSamples, partial_sum);
 }
@@ -1476,7 +1301,9 @@ void GpuMatrix::paramReluBackwardW(Matrix& oGrad, Matrix& data) {
   real* wgrad = data_;
   size_t numElements = data.getWidth();
   size_t numSamples = data.getHeight();
-  size_t partial_sum = numElements / (this->getHeight() * this->getWidth());
+  size_t paraSize = this->getHeight() * this->getWidth();
+  CHECK(!(numElements % paraSize));  // this check from ParameterReluLayer::init
+  size_t partial_sum = numElements / paraSize;
   hl_param_relu_backward_w(
       wgrad, ograd, input, numElements, numSamples, partial_sum);
 }
@@ -1488,7 +1315,9 @@ void GpuMatrix::paramReluBackwardDiff(Matrix& oGrad, Matrix& data, Matrix& W) {
   real* w = W.getData();
   size_t numElements = data.getWidth();
   size_t numSamples = data.getHeight();
-  size_t partial_sum = numElements / (W.getHeight() * W.getWidth());
+  size_t paraSize = W.getHeight() * W.getWidth();
+  CHECK(!(numElements % paraSize));  // this check from ParameterReluLayer::init
+  size_t partial_sum = numElements / paraSize;
   hl_param_relu_backward_diff(
       ograd, input, w, diff, numElements, numSamples, partial_sum);
 }
@@ -1836,11 +1665,13 @@ MatrixPtr CpuMatrix::getTranspose() {
   }
 }
 
-void CpuMatrix::transpose(MatrixPtr matTrans, bool memAlloc) {
+void CpuMatrix::transpose(MatrixPtr& matTrans, bool memAlloc) {
   if (memAlloc) {
     matTrans = std::make_shared<CpuMatrix>(width_, height_);
   } else {
     CHECK(matTrans != NULL);
+    CHECK_EQ(matTrans->getHeight(), width_);
+    CHECK_EQ(matTrans->getWidth(), height_);
   }
   real* dataTrans = matTrans->getData();
   real* data = getData();
@@ -1854,13 +1685,35 @@ void CpuMatrix::transpose(MatrixPtr matTrans, bool memAlloc) {
   }
 }
 
+void CpuMatrix::rotate(MatrixPtr& matRot, bool memAlloc, bool clockWise) {
+  if (memAlloc) {
+    matRot = std::make_shared<CpuMatrix>(width_, height_);
+  } else {
+    CHECK(matRot != NULL);
+    CHECK_EQ(matRot->getHeight(), width_);
+    CHECK_EQ(matRot->getWidth(), height_);
+  }
+  real* dataRot = matRot->getData();
+  real* data = getData();
+
+  for (size_t i = 0; i < height_; i++) {
+    for (size_t j = 0; j < width_; j++) {
+      if (clockWise) {
+        dataRot[j * height_ + i] = data[(height_ - i - 1) * width_ + j];
+      } else {
+        dataRot[j * height_ + i] = data[i * width_ + (width_ - j - 1)];
+      }
+    }
+  }
+}
+
 MatrixPtr CpuMatrix::getInverse() {
   MatrixPtr matInv;
   inverse(matInv, true);
   return matInv;
 }
 
-void CpuMatrix::inverse(MatrixPtr matInv, bool memAlloc) {
+void CpuMatrix::inverse(MatrixPtr& matInv, bool memAlloc) {
   CHECK_EQ(height_, width_);
 
   if (memAlloc) {
@@ -2219,84 +2072,6 @@ void CpuMatrix::avgPoolBackward(Matrix& input,
   }
 }
 
-void CpuMatrix::crossMapNormalFwd(Matrix& input,
-                                  size_t imgSizeH,
-                                  size_t imgSizeW,
-                                  Matrix& denoms,
-                                  size_t channels,
-                                  size_t sizeX,
-                                  float scale,
-                                  float pow) {
-  size_t num = input.getHeight();
-  size_t height = imgSizeH;
-  size_t width = imgSizeW;
-  size_t numCols = input.getWidth();
-  CHECK(height * width * channels == input.getWidth());
-  CHECK(denoms.getHeight() == input.getHeight() &&
-        denoms.getWidth() == input.getWidth() && input.getHeight() == height_ &&
-        input.getWidth() == width_);
-  real* imgData = input.getData();
-  real* diffData = input.getData();
-  real* targetData = getData();
-  size_t halfSize = sizeX / 2;
-  size_t imgPixels = height * width;
-
-  // use integral vector to implement the sum in local window
-  real* integralData =
-      (real*)malloc((channels + sizeX + 1) * sizeof(real));  // NOLINT // TODO:
-  for (size_t i = 0; i <= halfSize; i++) {
-    integralData[i] = 0;
-  }
-  for (size_t i = 0; i < num; i++) {
-    real* targetPtr = targetData + i * numCols;
-    real* imgPtr = imgData + i * numCols;
-    real* diffPtr = diffData + i * numCols;
-    for (size_t m = 0; m < height; m++) {
-      for (size_t n = 0; n < width; n++) {
-        for (size_t c = 0; c < channels; c++) {
-          integralData[c + halfSize + 1] =
-              integralData[c + halfSize] + _square(*(diffPtr + c * imgPixels));
-        }
-        for (size_t k = channels + halfSize + 1; k <= channels + sizeX; k++) {
-          integralData[k] = integralData[channels + halfSize];
-        }
-        for (size_t k = 0; k < channels; k += 1) {
-          real a = integralData[k + sizeX] - integralData[k];
-          a = scale * a + 1;
-          targetPtr[k * imgPixels] = imgPtr[k * imgPixels] * _pow(a, -pow);
-        }
-        diffPtr++;
-        targetPtr++;
-        imgPtr++;
-      }
-    }
-  }
-  free(integralData);
-  integralData = NULL;
-}
-
-void CpuMatrix::crossMapNormalBwd(Matrix& localGrad,
-                                  Matrix& denoms,
-                                  Matrix& preOutV,
-                                  Matrix& localOutV,
-                                  size_t channels,
-                                  size_t imgSizeH,
-                                  size_t imgSizeW,
-                                  size_t size,
-                                  float scale,
-                                  float pow) {
-  LOG(FATAL) << "Not implemented";
-
-  CHECK(imgSizeH * imgSizeW * channels == preOutV.getWidth());
-  CHECK(denoms.getHeight() == preOutV.getHeight() &&
-        denoms.getWidth() == preOutV.getWidth() &&
-        preOutV.getHeight() == height_ && preOutV.getWidth() == width_);
-  CHECK(denoms.getHeight() == localGrad.getHeight() &&
-        denoms.getWidth() == localGrad.getWidth());
-
-  // NOLINT // TODO:
-}
-
 /**
  * Input: one or more sequences. Each sequence contains some instances.
  * Output: output size is the number of input sequences (NOT input instances).
@@ -2367,120 +2142,6 @@ void CpuMatrix::maxSequenceBackward(Matrix& outputGrad,
       // each dim
       int insId = maxIndex[sequenceId * dim + j];
       inputGrad[insId * dim + j] += outGrad[sequenceId * dim + j];
-    }
-  }
-}
-
-void CpuMatrix::contextProjectionForward(MatrixPtr input,
-                                         MatrixPtr weight,
-                                         const IVector& sequence,
-                                         int contextLength,
-                                         int contextStart,
-                                         size_t beginPad,
-                                         bool isPadding) {
-  CHECK(dynamic_cast<CpuMatrix*>(input.get()));
-  CHECK(dynamic_cast<const CpuIVector*>(&sequence));
-  if (weight) CHECK(dynamic_cast<CpuMatrix*>(weight.get()));
-
-  size_t numSequences = sequence.getSize() - 1;
-  int64_t inputDim = input->getWidth();
-  int64_t dim = getWidth();
-  CHECK_EQ(dim, inputDim * contextLength);
-  const int* starts = sequence.getData();
-
-  for (size_t i = 0; i < numSequences; ++i) {
-    for (int j = 0; j < contextLength; ++j) {
-      int begin = starts[i] + contextStart + j;
-      int end = starts[i + 1] + contextStart + j;
-      int dstBegin = starts[i];
-      int dstEnd = starts[i + 1];
-      if (begin < starts[i]) {
-        int64_t padSize =
-            std::min(starts[i] - begin, starts[i + 1] - starts[i]);
-        MatrixPtr mat = this->subMatrix(starts[i], padSize);
-        if (isPadding) {
-          MatrixPtr sub = weight->subMatrix(j, padSize);
-          mat->addAtOffset(*sub, j * inputDim);
-        }
-        dstBegin = starts[i] + padSize;
-        begin = starts[i];
-      }
-      if (end > starts[i + 1]) {
-        int64_t padSize =
-            std::min(end - starts[i + 1], starts[i + 1] - starts[i]);
-        MatrixPtr mat = this->subMatrix(starts[i + 1] - padSize, padSize);
-        if (isPadding) {
-          MatrixPtr sub =
-              weight->subMatrix(beginPad + contextStart + j - padSize, padSize);
-          mat->addAtOffset(*sub, j * inputDim);
-        }
-        dstEnd = starts[i + 1] - padSize;
-        end = starts[i + 1];
-      }
-      if (end <= begin) continue;
-      MatrixPtr src = input->subMatrix(begin, end - begin);
-      MatrixPtr dst = this->subMatrix(dstBegin, dstEnd - dstBegin);
-      dst->addAtOffset(*src, j * inputDim);
-    }
-  }
-}
-
-void CpuMatrix::contextProjectionBackward(MatrixPtr inputGrad,
-                                          MatrixPtr weightGrad,
-                                          const IVector& sequence,
-                                          int contextLength,
-                                          int contextStart,
-                                          size_t beginPad,
-                                          bool isPadding) {
-  if (inputGrad) CHECK(dynamic_cast<CpuMatrix*>(inputGrad.get()));
-  if (weightGrad) CHECK(dynamic_cast<CpuMatrix*>(weightGrad.get()));
-  CHECK(dynamic_cast<const CpuIVector*>(&sequence));
-
-  int64_t inputDim = 0;
-  int64_t dim = getWidth();
-  size_t numSequences = sequence.getSize() - 1;
-  const int* starts = sequence.getData();
-  if (inputGrad) {
-    inputDim = inputGrad->getWidth();
-  } else {
-    inputDim = weightGrad->getWidth();
-  }
-  CHECK_EQ(dim, inputDim * contextLength);
-
-  for (size_t i = 0; i < numSequences; ++i) {
-    for (int j = 0; j < contextLength; ++j) {
-      int begin = starts[i] + contextStart + j;
-      int end = starts[i + 1] + contextStart + j;
-      int dstBegin = starts[i];
-      int dstEnd = starts[i + 1];
-      if (begin < starts[i]) {
-        int64_t padSize =
-            std::min(starts[i] - begin, starts[i + 1] - starts[i]);
-        if (isPadding && weightGrad) {
-          MatrixPtr mat = this->subMatrix(starts[i], padSize);
-          MatrixPtr sub = weightGrad->subMatrix(j, padSize);
-          sub->addAtOffset(*mat, j * inputDim);
-        }
-        dstBegin = starts[i] + padSize;
-        begin = starts[i];
-      }
-      if (end > starts[i + 1]) {
-        int64_t padSize =
-            std::min(end - starts[i + 1], starts[i + 1] - starts[i]);
-        if (isPadding && weightGrad) {
-          MatrixPtr mat = this->subMatrix(starts[i + 1] - padSize, padSize);
-          MatrixPtr sub = weightGrad->subMatrix(
-              beginPad + contextStart + j - padSize, padSize);
-          sub->addAtOffset(*mat, j * inputDim);
-        }
-        dstEnd = starts[i + 1] - padSize;
-        end = starts[i + 1];
-      }
-      if (end <= begin) continue;
-      if (!inputGrad) continue;
-      MatrixPtr src = inputGrad->subMatrix(begin, end - begin);
-      MatrixPtr dst = this->subMatrix(dstBegin, dstEnd - dstBegin);
-      src->addAtOffset(*dst, j * inputDim);
     }
   }
 }
@@ -2630,29 +2291,22 @@ void CpuMatrix::sequenceAvgForward(Matrix& a,
 }
 
 /* this = scaleAB*(a*b) + scaleT*this*/
-void CpuMatrix::mul(const MatrixPtr a,
-                    const MatrixPtr b,
+void CpuMatrix::mul(const Matrix& a,
+                    const Matrix& b,
                     real scaleAB,
                     real scaleT) {
   CHECK(!isTransposed()) << "Not supported";
+  const auto a_ptr = dynamic_cast<const CpuMatrix*>(&a);
+  const auto b_ptr = dynamic_cast<const CpuMatrix*>(&b);
+  const auto a_ptr_s = dynamic_cast<const CpuSparseMatrix*>(&a);
+  const auto b_ptr_s = dynamic_cast<const CpuSparseMatrix*>(&b);
 
-  if (dynamic_cast<CpuMatrix*>(a.get()) && dynamic_cast<CpuMatrix*>(b.get())) {
-    mul(dynamic_cast<CpuMatrix*>(a.get()),
-        dynamic_cast<CpuMatrix*>(b.get()),
-        scaleAB,
-        scaleT);
-  } else if (dynamic_cast<CpuSparseMatrix*>(a.get()) &&
-             dynamic_cast<CpuMatrix*>(b.get())) {
-    mul(dynamic_cast<CpuSparseMatrix*>(a.get()),
-        dynamic_cast<CpuMatrix*>(b.get()),
-        scaleAB,
-        scaleT);
-  } else if (dynamic_cast<CpuMatrix*>(a.get()) &&
-             dynamic_cast<CpuSparseMatrix*>(b.get())) {
-    mul(dynamic_cast<CpuMatrix*>(a.get()),
-        dynamic_cast<CpuSparseMatrix*>(b.get()),
-        scaleAB,
-        scaleT);
+  if (a_ptr && b_ptr) {
+    mul((CpuMatrix*)a_ptr, (CpuMatrix*)b_ptr, scaleAB, scaleT);
+  } else if (a_ptr_s && b_ptr) {
+    mul((CpuSparseMatrix*)a_ptr_s, (CpuMatrix*)b_ptr, scaleAB, scaleT);
+  } else if (a_ptr && b_ptr_s) {
+    mul((CpuMatrix*)a_ptr, (CpuSparseMatrix*)b_ptr_s, scaleAB, scaleT);
   } else {
     LOG(FATAL) << "Not supported";
   }
@@ -3321,7 +2975,7 @@ void CpuMatrix::addColumnVector(const Matrix& b) {
 }
 
 /* this = a*b */
-void CpuMatrix::mul(const MatrixPtr a, const MatrixPtr b) {
+void CpuMatrix::mul(const Matrix& a, const Matrix& b) {
   return mul(a, b, 1.0, 0.0);
 }
 
@@ -3544,21 +3198,20 @@ void CpuMatrix::rowNormalizeL1(Matrix& out) {
 }
 
 /* calulate classification error */
-void CpuMatrix::classificationError(MatrixPtr output, IVectorPtr label) {
-  CHECK(dynamic_cast<CpuMatrix*>(output.get()));
-  CHECK(dynamic_cast<CpuIVector*>(label.get()));
+void CpuMatrix::classificationError(Matrix& output, IVector& label) {
+  CHECK(dynamic_cast<const CpuMatrix*>(&output));
+  CHECK(dynamic_cast<const CpuIVector*>(&label));
 
-  size_t numSamples = getHeight();
-  size_t dim = output->getWidth();
-  CHECK_EQ(label->getSize(), numSamples);
-  CHECK_EQ(output->getHeight(), numSamples);
   CHECK_EQ(getWidth(), (size_t)1);
+  size_t numSamples = getHeight();
+  CHECK_EQ(label.getSize(), numSamples);
+  CHECK_EQ(output.getHeight(), numSamples);
 
-  real* out = output->getData();
-  real* result = getData();
-  int* lbl = label->getData();
-  real maxData;
-  int maxIndex;
+  size_t dim = output.getWidth();
+  real* out = output.getData();
+  int* lbl = label.getData();
+  real maxData = 0.0;
+  int maxIndex = -1;
   for (size_t i = 0; i < numSamples; ++i) {
     CHECK_GE(lbl[i], 0);
     CHECK_LT((size_t)lbl[i], dim);
@@ -3570,7 +3223,7 @@ void CpuMatrix::classificationError(MatrixPtr output, IVectorPtr label) {
         maxData = out[i * dim + j];
       }
     }
-    result[i] = (maxIndex != lbl[i]);
+    getData()[i] = (maxIndex != lbl[i]);
   }
 }
 
@@ -3760,105 +3413,6 @@ void CpuMatrix::softmaxDerivative(Matrix& output, Matrix& sftmaxSum) {
     real sum = sums[i];
     for (size_t j = 0; j < dim; ++j) {
       grad[j] = out[j] * (grad[j] - sum);
-    }
-  }
-}
-
-void CpuMatrix::cosSim(Matrix& output1, Matrix& output2, real scale) {
-  size_t numSamples = getHeight();
-  size_t dim = output1.getWidth();
-  CHECK_EQ(getWidth(), 1UL);
-  CHECK_EQ(output1.getHeight(), numSamples);
-  CHECK_EQ(output1.getWidth(), output2.getWidth());
-
-  real* out = getData();
-  const real* x = output1.getData();
-  const real* y = output2.getData();
-  size_t yInc = dim;
-  if (output2.getHeight() == 1LU) {
-    yInc = 0;
-  } else {
-    CHECK_EQ(output2.getHeight(), numSamples);
-  }
-  for (size_t i = 0; i < numSamples; ++i, x += dim, y += yInc) {
-    real squareSumX = 0;
-    real squareSumY = 0;
-    real xy = 0;
-    for (size_t j = 0; j < dim; ++j) {
-      squareSumX += _square(x[j]);
-      squareSumY += _square(y[j]);
-      xy += x[j] * y[j];
-    }
-    CHECK(squareSumX > 0 && squareSumY > 0);
-    out[i] = scale * xy / (std::sqrt(squareSumX) * std::sqrt(squareSumY));
-  }
-}
-
-void CpuMatrix::cosSimDerivative(Matrix& output,
-                                 Matrix& prevOut1,
-                                 Matrix& prevOut2,
-                                 Matrix& prevGrad1,
-                                 Matrix& prevGrad2,
-                                 real scale) {
-  CHECK(output.useGpu_ == false) << "Matrix type are not equal";
-
-  CHECK_EQ(getWidth(), 1UL);
-  CHECK_EQ(output.getWidth(), 1UL);
-
-  size_t numSamples = getHeight();
-  CHECK_EQ(output.getHeight(), numSamples);
-  CHECK_EQ(prevOut1.getHeight(), numSamples);
-  CHECK_EQ(prevGrad1.getHeight(), numSamples);
-
-  size_t dim = prevOut1.getWidth();
-  CHECK_EQ(prevOut2.getWidth(), dim);
-  CHECK_EQ(prevGrad1.getWidth(), dim);
-  CHECK_EQ(prevGrad2.getWidth(), dim);
-
-  const real* grad = getData();
-  const real* out = output.getData();
-  const real* prevOutX = prevOut1.getData();
-  const real* prevOutY = prevOut2.getData();
-  real* prevGradX = prevGrad1.getData();
-  real* prevGradY = prevGrad2.getData();
-  size_t yInc = dim;
-  if (prevOut2.getHeight() == 1LU) {
-    yInc = 0;
-    CHECK_EQ(prevGrad2.getHeight(), 1LU);
-  } else {
-    CHECK_EQ(prevOut2.getHeight(), numSamples);
-    CHECK_EQ(prevGrad2.getHeight(), numSamples);
-  }
-  for (size_t i = 0; i < numSamples; ++i,
-              prevOutX += dim,
-              prevOutY += yInc,
-              prevGradX += dim,
-              prevGradY += yInc) {
-    real squareSumX = 0;
-    real squareSumY = 0;
-    real xy = 0;
-    for (size_t j = 0; j < dim; ++j) {
-      squareSumX += _square(prevOutX[j]);
-      squareSumY += _square(prevOutY[j]);
-      xy += prevOutX[j] * prevOutY[j];
-    }
-    CHECK(squareSumX > 0 && squareSumY > 0);
-    if (xy == 0) {
-      real reciprocal = 1.0f / (std::sqrt(squareSumX) * std::sqrt(squareSumY));
-      for (size_t j = 0; j < dim; ++j) {
-        prevGradX[j] += scale * grad[i] * prevOutY[j] * reciprocal;
-        prevGradY[j] += scale * grad[i] * prevOutX[j] * reciprocal;
-      }
-    } else {
-      real reciprocalXY = 1.0f / xy;
-      real reciprocalSquareSumX = 1.0f / squareSumX;
-      real reciprocalSquareSumY = 1.0f / squareSumY;
-      for (size_t j = 0; j < dim; ++j) {
-        prevGradX[j] += out[i] * grad[i] * (prevOutY[j] * reciprocalXY -
-                                            prevOutX[j] * reciprocalSquareSumX);
-        prevGradY[j] += out[i] * grad[i] * (prevOutX[j] * reciprocalXY -
-                                            prevOutY[j] * reciprocalSquareSumY);
-      }
     }
   }
 }
@@ -4116,7 +3670,9 @@ void CpuMatrix::paramReluForward(Matrix& data, Matrix& W) {
   real* w = W.getData();
   size_t numElements = data.getWidth();
   size_t numSamples = data.getHeight();
-  size_t partial_sum = numElements / (W.getHeight() * W.getWidth());
+  size_t paraSize = W.getHeight() * W.getWidth();
+  CHECK(!(numElements % paraSize));  // this check from ParameterReluLayer::init
+  size_t partial_sum = numElements / paraSize;
   for (size_t n = 0, k = 0; n < numSamples; ++n) {
     for (size_t i = 0; i < numElements; ++i, ++k) {
       data_[k] = input[k] > 0 ? input[k] : input[k] * w[i / partial_sum];
@@ -4130,7 +3686,9 @@ void CpuMatrix::paramReluBackwardW(Matrix& oGrad, Matrix& data) {
   real* wgrad = data_;
   size_t numElements = data.getWidth();
   size_t numSamples = data.getHeight();
-  size_t partial_sum = numElements / (this->getHeight() * this->getWidth());
+  size_t paraSize = this->getHeight() * this->getWidth();
+  CHECK(!(numElements % paraSize));  // this check from ParameterReluLayer::init
+  size_t partial_sum = numElements / paraSize;
   for (size_t n = 0, k = 0; n < numSamples; ++n) {
     for (size_t i = 0; i < numElements; ++i, ++k) {
       wgrad[i / partial_sum] += ograd[k] * (input[k] > 0 ? 0 : input[k]);
@@ -4145,7 +3703,9 @@ void CpuMatrix::paramReluBackwardDiff(Matrix& oGrad, Matrix& data, Matrix& W) {
   real* w = W.getData();
   size_t numElements = data.getWidth();
   size_t numSamples = data.getHeight();
-  size_t partial_sum = numElements / (W.getHeight() * W.getWidth());
+  size_t paraSize = W.getHeight() * W.getWidth();
+  CHECK(!(numElements % paraSize));  // this check from ParameterReluLayer::init
+  size_t partial_sum = numElements / paraSize;
   for (size_t n = 0, k = 0; n < numSamples; ++n) {
     for (size_t i = 0; i < numElements; ++i, ++k) {
       diff[k] += ograd[k] * (input[k] > 0 ? 1 : w[i / partial_sum]);

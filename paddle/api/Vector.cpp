@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -253,7 +253,7 @@ void Vector::copyToNumpyArray(float** view_m_data, int* dim1) {
   *view_m_data = new float[*dim1];
   if (auto cpuVec = dynamic_cast<paddle::CpuVector*>(m->vec.get())) {
     std::memcpy(*view_m_data, cpuVec->getData(), sizeof(float) * (*dim1));
-  } else if (auto gpuVec = dynamic_cast<paddle::CpuVector*>(m->vec.get())) {
+  } else if (auto gpuVec = dynamic_cast<paddle::GpuVector*>(m->vec.get())) {
     hl_memcpy_device2host(
         *view_m_data, gpuVec->getData(), sizeof(float) * (*dim1));
   } else {
@@ -282,7 +282,7 @@ FloatArray Vector::getData() const {
 }
 
 void Vector::copyFrom(Vector* src) throw(RangeError) {
-  if (src->m->vec->getSize() !=  m->vec->getSize()) {
+  if (src->m->vec->getSize() != m->vec->getSize()) {
     throw RangeError();
   }
   m->vec->copyFrom(*src->m->vec);

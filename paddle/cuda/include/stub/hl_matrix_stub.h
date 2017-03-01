@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -74,25 +74,6 @@ inline void hl_param_relu_backward_diff(real* grad_o,
                                         int height,
                                         int partial_sum) {}
 
-inline void hl_cossim(real* output,
-                      real* input1,
-                      real* input2,
-                      int width,
-                      int input1_height,
-                      int input2_height,
-                      real scale) {}
-
-inline void hl_cossim_derivative(real* grad,
-                                 real* output,
-                                 real* prevOutX,
-                                 real* prevOutY,
-                                 real* prevGradX,
-                                 real* prevGradY,
-                                 int width,
-                                 int input1_height,
-                                 int input2_height,
-                                 real scale) {}
-
 inline void hl_matrix_add_shared_bias(real* A_d,
                                       real* B_d,
                                       const int channel,
@@ -106,4 +87,8 @@ inline void hl_matrix_collect_shared_bias(real* B_d,
                                           const int dimM,
                                           const int dimN,
                                           real scale) {}
+
+inline void hl_matrix_rotate(
+    real* mat, real* matRot, int dimM, int dimN, bool clockWise) {}
+
 #endif  // HL_MATRIX_STUB_H_
